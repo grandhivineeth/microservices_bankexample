@@ -1,10 +1,13 @@
 package com.vineeth.accounts.service.impl;
 
 import com.vineeth.accounts.constants.AccountsConstants;
+import com.vineeth.accounts.dto.AccountsDto;
 import com.vineeth.accounts.dto.CustomerDto;
 import com.vineeth.accounts.entity.Accounts;
 import com.vineeth.accounts.entity.Customer;
 import com.vineeth.accounts.exception.CustomerAlreadyExistsException;
+import com.vineeth.accounts.exception.ResourceNotFoundException;
+import com.vineeth.accounts.mapper.AccountsMapper;
 import com.vineeth.accounts.mapper.CustomerMapper;
 import com.vineeth.accounts.repository.AccountsRepository;
 import com.vineeth.accounts.repository.CustomerRepository;
@@ -12,6 +15,7 @@ import com.vineeth.accounts.service.IAccountsService;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Random;
 
@@ -31,9 +35,12 @@ public class AccountsServiceImpl implements IAccountsService {
             throw new CustomerAlreadyExistsException("Customer already registered with the given mobile number" + customerDto.getMobileNumber());
         }
 
+        customer.setCreatedAt(LocalDateTime.now());
+        customer.setCreatedBy("Anonymous");
         Customer savedCustomer = customerRepository.save(customer);
         accountsRepository.save(createNewAccount(savedCustomer));
     }
+
 
     /**
      * @param customer - Customer Object
@@ -47,6 +54,24 @@ public class AccountsServiceImpl implements IAccountsService {
         newAccount.setAccountNumber(randomAccNumber);
         newAccount.setAccountType(AccountsConstants.SAVINGS);
         newAccount.setBranchAddress(AccountsConstants.ADDRESS);
+        newAccount.setCreatedAt(LocalDateTime.now());
+        newAccount.setCreatedBy("Anonymous");
+
         return newAccount;
+    }
+
+    @Override
+    public CustomerDto fetchAccountDetails(String mobileNumber) {
+        Customer customer = customerRepository.findByMobileNumber(mobileNumber).orElseThrow(
+                () -> new ResourceNotFoundException("Customer", "mobileNumber", mobileNumber)
+        );
+
+        Accounts accounts = accountsRepository.findByCustomerId(customer.getCustomerId()).orElseThrow(
+                () -> new ResourceNotFoundException("Account", "customerId", customer.getCustomerId().toString())
+        );
+
+        CustomerDto customerDto =   CustomerMapper.mapToCustomerDto(customer, new CustomerDto());
+        customerDto.setAccountsDto(AccountsMapper.mapToAccountsDto(accounts, new AccountsDto()));
+        return customerDto;
     }
 }
